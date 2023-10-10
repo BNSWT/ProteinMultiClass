@@ -75,7 +75,6 @@ def get_seq(output_full_path, input_fasta_path, output_seq_path):
 
     print(f"转换完成，结果已保存到 {output_seq_path}")
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--dbtl_path', type=str, default='/shanjunjie/protein/dtbl_files/bacteria.nonredundant_protein.1.protein.dtbl')

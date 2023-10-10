@@ -13,18 +13,6 @@ from torch.optim.lr_scheduler import StepLR
 from transformers import EsmTokenizer, EsmForSequenceClassification
 model_path = "../esm2_t33_650M_UR50D"
 
-# add parameters
-import argparse
-# overasmpling_size, finetune_layer, lr, weight_decay, batch_size, sechdule_gamma
-parser = argparse.ArgumentParser()
-parser.add_argument('--oversampling_size', type=int, default=150)
-parser.add_argument('--finetune_layer', type=int, default=5)
-parser.add_argument('--lr', type=float, default=5e-5)
-parser.add_argument('--weight_decay', type=float, default=0.01)
-parser.add_argument('--batch_size', type=int, default=16)
-parser.add_argument('--sechdule_gamma', type=float, default=0.9)
-parser.add_argument('--device', type=int, default=0)
-args = parser.parse_args()
 
 
 class ProSeqDataset(Dataset):
@@ -114,7 +102,7 @@ class ProFunCla(pl.LightningModule):
         self.log("val_acc", acc)
         
         classes = torch.load("/shanjunjie/ProteinMultiClass/convert_csv/labelid2label.pt")
-        df = pd.DataFrame(logits.numpy(), columns=classes)
+        df = pd.DataFrame(logits.cpu().numpy(), columns=classes)
 
         part = pd.DataFrame(columns=["sequence", "pred", "score"])
         for i, seq in enumerate(seqs):
@@ -208,7 +196,7 @@ def main(args):
     esm_model = EsmForSequenceClassification.from_pretrained(pretrained_model_name_or_path = model_path, num_labels = num_labels)
 
     # model = ProFunCla(model=esm_model, lr=args.lr, weight_decay=args.weight_decay, finetune_layer=args.finetune_layer, gama=args.sechdule_gamma, oversampling=args.oversampling_size)
-    model = ProFunCla.load_from_checkpoint(model = esm_model,checkpoint_path=args.checkpoint_path)
+    model = ProFunCla.load_from_checkpoint(model = esm_model,checkpoint_path=args.checkpoint_path, part_result=args.part_result_path, full_result=args.full_result_path)
     trainer = pl.Trainer(accelerator="gpu", 
                         devices=[0,1,2,3], 
                         # devices=8,
@@ -227,5 +215,12 @@ if __name__ == "__main__":
     parser.add_argument('--checkpoint_path', type=str, default="/shanjunjie/ProteinMultiClass/checkpoint/epoch=6-val_acc=0.9111-loss=0.0000.ckpt")
     parser.add_argument('--part_result_path', type=str, default="/shanjunjie/ProteinMultiClass/convert_csv/part_result.csv")
     parser.add_argument('--full_result_path', type=str, default="/shanjunjie/ProteinMultiClass/convert_csv/full_result.csv")
+    parser.add_argument('--oversampling_size', type=int, default=150)
+    parser.add_argument('--finetune_layer', type=int, default=5)
+    parser.add_argument('--lr', type=float, default=5e-5)
+    parser.add_argument('--weight_decay', type=float, default=0.01)
+    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--sechdule_gamma', type=float, default=0.9)
+    parser.add_argument('--device', type=int, default=0)
     args = parser.parse_args()
     main(args)
