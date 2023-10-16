@@ -75,12 +75,35 @@ def get_seq(output_full_path, input_fasta_path, output_seq_path):
 
     print(f"转换完成，结果已保存到 {output_seq_path}")
 
+def get_domain(output_full_path, output_seq_path, output_domain_path):
+    df = pd.read_csv(output_full_path)
+    df_seq = pd.read_csv(output_seq_path)
+    
+    with open(output_domain_path, 'w', newline='') as csv_file:
+        # 创建CSV写入器
+        csv_writer = csv.writer(csv_file)
+        
+        # 写入CSV文件的标题行
+        csv_writer.writerow(['target', 'name', 'domain'])
+        for index, row in df.iterrows():
+            target = row['Target']
+            seq_name = row['Query']
+            begin = int(row['Env Start'])-1
+            end = int(row['Env End'])
+            domain = df_seq[df_seq['name'] == seq_name]['sequence'].values[0][begin:end]
+            # 将提取的信息写入CSV文件
+            csv_writer.writerow([target, seq_name, domain])
+    print(f"转换完成，结果已保存到 {output_domain_path}")
+            
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--dbtl_path', type=str, default='/shanjunjie/protein/dtbl_files/bacteria.nonredundant_protein.1.protein.dtbl')
     parser.add_argument('--fasta_path', type=str, default='/shanjunjie/protein/fasta/bacteria.nonredundant_protein.1.protein.faa')
     parser.add_argument('--output_full_path', type=str, default='full.csv')
     parser.add_argument("--output_seq_path", type=str, default='seq.csv')
+    parser.add_argument("--output_domain_path", type=str, default='domain.csv')
     args = parser.parse_args()
-    convert(args.dbtl_path, args.output_full_path)
-    get_seq(args.output_full_path, args.fasta_path, args.output_seq_path)
+    # convert(args.dbtl_path, args.output_full_path)
+    # get_seq(args.output_full_path, args.fasta_path, args.output_seq_path)
+    get_domain(args.output_full_path, args.output_seq_path, args.output_domain_path)

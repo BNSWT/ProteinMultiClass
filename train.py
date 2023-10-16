@@ -68,13 +68,12 @@ class ProFunCla(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         seqs, input_ids, attention_mask, labels = batch
         outputs = self(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-        loss = outputs.loss
+        loss = outputs['loss']
         return loss
     
     def training_epoch_end(self, outputs):
-        loss = torch.stack([x for x in outputs]).mean()
+        loss = torch.stack([x['loss'] for x in outputs]).mean()
         self.log("loss", loss)
-        return loss
     
     def validation_step(self, batch, batch_idx):
         seqs, input_ids, attention_mask, labels = batch
@@ -104,6 +103,21 @@ class ProFunCla(pl.LightningModule):
         torch.save(labels, "/shanjunjie/ProteinMultiClass/data/result/labels.pt")
         acc = logits.argmax(dim=1).eq(labels).sum().item() / labels.size(0)
         self.log("val_acc", acc)
+        
+        prob = torch.nn.functional.softmax(logits, dim=1)
+        
+        classes = torch.load("/shanjunjie/ProteinMultiClass/convert_csv/labelid2label.pt")
+        df = pd.DataFrame(prob.cpu().numpy(), columns=classes)
+
+        part = pd.DataFrame(columns=["sequence", "pred", "score"])
+        for i, seq in enumerate(seqs):
+            part.loc[i] = [seq, df.iloc[i].idxmax(), df.iloc[i].max()]
+        part.to_csv("/shanjunjie/ProteinMultiClass/data/result/core_part.csv", index=False)
+
+        whole = pd.DataFrame(columns=["sequence", "pred", "score"]+list(classes))
+        for i, seq in enumerate(seqs):
+            whole.loc[i] = [seq, df.iloc[i].idxmax(), df.iloc[i].max()] + df.iloc[i].tolist()
+        whole.to_csv("/shanjunjie/ProteinMultiClass/data/result/core_full.csv", index=False)
         return acc
         
     def configure_optimizers(self):
@@ -162,8 +176,6 @@ if __name__ == "__main__":
     df = pd.read_csv('/shanjunjie/ProteinMultiClass/data/AIdataset230810.csv')
     df = preprocess(df, max_len=max_seq_len)
     train_df, val_df = train_eval_split(df, val_ratio, random_state=random_seed)
-    train_df.to_csv("train.csv", index=False)
-    val_df.to_csv("test.csv", index=False)
     oversampling_size = args.oversampling_size
     for label in train_df['label'].unique():
         label_df = train_df[train_df['label'] == label]
@@ -181,14 +193,14 @@ if __name__ == "__main__":
     esm_model = EsmForSequenceClassification.from_pretrained(pretrained_model_name_or_path = model_path, num_labels = num_labels)
 
     # model = ProFunCla(model=esm_model, lr=args.lr, weight_decay=args.weight_decay, finetune_layer=args.finetune_layer, gama=args.sechdule_gamma, oversampling=args.oversampling_size)
-    model = ProFunCla.load_from_checkpoint(model = esm_model,checkpoint_path="/shanjunjie/ProteinMultiClass/checkpoint/epoch=4-val_acc=0.8778-loss=0.0000.ckpt")
+    model = ProFunCla.load_from_checkpoint(model = esm_model,checkpoint_path="/shanjunjie/ProteinMultiClass/checkpoint/epoch=14-val_acc=0.8944-loss=0.0052.ckpt")
     # save the checkpoint with name as oversampling_size and finetune_layer and val_acc
     checkpoint_callback = ModelCheckpoint(dirpath="./checkpoint/", save_top_k=-1, monitor="val_acc", mode='max', auto_insert_metric_name=True, filename="{epoch}-{val_acc:.4f}-{loss:.4f}")
     early_stop_callback = EarlyStopping(monitor="loss", min_delta=0.00, patience=15, verbose=False, mode="min")
     # wandb_logger = pl.loggers.WandbLogger(project="ProteinMultiClass", name="esm2_t33_650M_UR50D")
     trainer = pl.Trainer(accelerator="gpu", 
-                        devices=[0,1,2,3], 
-                        # devices=8,
+                        devices=[0],
+                        strategy='ddp',
                         # strategy='fsdp_native',
                         max_epochs=50,
                         gradient_clip_algorithm='norm',
@@ -197,7 +209,7 @@ if __name__ == "__main__":
                         # logger=wandb_logger,
                         )
 
-    trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    # trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
     trainer.test(model=model, dataloaders=val_loader)
     
     

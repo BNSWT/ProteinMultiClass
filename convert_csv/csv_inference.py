@@ -27,7 +27,7 @@ class ProSeqDataset(Dataset):
             self.num_labels = df['label'].nunique()
         else: # validation only
             self.mapped_label, self.labelid2label = None, None
-            self.num_labels = None
+            self.num_labels = 43
                 
     def __len__(self):
         return len(self.df)
@@ -177,6 +177,8 @@ def main(args):
     val_df.to_csv("test.csv", index=False)
     
     val_df = pd.read_csv(args.inference_dataset)
+    if "sequence" not in val_df.columns:
+        val_df = val_df.rename(columns={"domain": "sequence"})
     val_df = val_df[val_df["sequence"].apply(lambda x: len(x)) < max_seq_len]
 
     oversampling_size = args.oversampling_size
