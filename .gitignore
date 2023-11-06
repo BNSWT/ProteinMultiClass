@@ -164,3 +164,7 @@ checkpoint/
 lightning_logs/
 wandb/
 *.csv
+visual/data/
+scan/result/
+scan/script/
+scan/log.txt

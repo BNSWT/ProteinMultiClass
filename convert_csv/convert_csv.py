@@ -104,6 +104,6 @@ if __name__ == "__main__":
     parser.add_argument("--output_seq_path", type=str, default='seq.csv')
     parser.add_argument("--output_domain_path", type=str, default='domain.csv')
     args = parser.parse_args()
-    # convert(args.dbtl_path, args.output_full_path)
-    # get_seq(args.output_full_path, args.fasta_path, args.output_seq_path)
+    convert(args.dbtl_path, args.output_full_path)
+    get_seq(args.output_full_path, args.fasta_path, args.output_seq_path)
     get_domain(args.output_full_path, args.output_seq_path, args.output_domain_path)

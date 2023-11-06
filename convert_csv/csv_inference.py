@@ -33,7 +33,7 @@ class ProSeqDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx):
-        if self.num_labels is None:
+        if self.mapped_label is None:
             label = 0
         else:
             label = self.mapped_label[idx]
@@ -96,13 +96,17 @@ class ProFunCla(pl.LightningModule):
     
     def test_epoch_end(self, outputs):
         seqs = [x[0] for x in outputs]
+        seqs = [s for seq in seqs for s in seq]
         logits = torch.cat([x[1].logits for x in outputs], dim=0)
         labels = torch.cat([x[2] for x in outputs], dim=0)
         acc = logits.argmax(dim=1).eq(labels).sum().item() / labels.size(0)
         self.log("val_acc", acc)
         
+        prob = torch.nn.functional.softmax(logits, dim=1)
+        
+        
         classes = torch.load("/shanjunjie/ProteinMultiClass/convert_csv/labelid2label.pt")
-        df = pd.DataFrame(logits.cpu().numpy(), columns=classes)
+        df = pd.DataFrame(prob.cpu().numpy(), columns=classes)
 
         part = pd.DataFrame(columns=["sequence", "pred", "score"])
         for i, seq in enumerate(seqs):
@@ -213,7 +217,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_dataset', type=str, default='/shanjunjie/ProteinMultiClass/data/AIdataset230810.csv')
-    parser.add_argument('--inference_dataset', type=str, default="/shanjunjie/ProteinMultiClass/convert_csv/seq.csv")
+    parser.add_argument('--inference_dataset', type=str, default="/shanjunjie/ProteinMultiClass/scan/result/csv/domain/bacteria.nonredundant_protein.1.protein.csv")
     parser.add_argument('--checkpoint_path', type=str, default="/shanjunjie/ProteinMultiClass/checkpoint/epoch=6-val_acc=0.9111-loss=0.0000.ckpt")
     parser.add_argument('--part_result_path', type=str, default="/shanjunjie/ProteinMultiClass/convert_csv/part_result.csv")
     parser.add_argument('--full_result_path', type=str, default="/shanjunjie/ProteinMultiClass/convert_csv/full_result.csv")
