@@ -43,7 +43,7 @@ class ProSeqDataset(Dataset):
         return seqs, input_ids, attention_mask, label
     
 class ProFunCla(pl.LightningModule):
-    def __init__(self, model, lr, weight_decay, finetune_layer, gama, oversampling, part_result, full_result, **kwargs):
+    def __init__(self, model, lr, weight_decay, finetune_layer, gama, oversampling, part_result, full_result, pt_result, **kwargs):
         super().__init__()
         self.save_hyperparameters(ignore=["model"])
         self.model = model
@@ -57,6 +57,7 @@ class ProFunCla(pl.LightningModule):
         self.oversampling = oversampling
         self.part_result_path = part_result
         self.full_result_path = full_result
+        self.pt_result_path = pt_result
 
     def forward(self, input_ids, attention_mask, labels=None):
         output = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
@@ -91,14 +92,17 @@ class ProFunCla(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         seqs, input_ids, attention_mask, labels = batch
         outputs = self(input_ids=input_ids, attention_mask=attention_mask)
-        return seqs, outputs, labels
-    
+        return seqs, outputs.logits, outputs.hidden_states[-1], labels
     
     def test_epoch_end(self, outputs):
         seqs = [x[0] for x in outputs]
         seqs = [s for seq in seqs for s in seq]
-        logits = torch.cat([x[1].logits for x in outputs], dim=0)
-        labels = torch.cat([x[2] for x in outputs], dim=0)
+        logits = torch.cat([x[1] for x in outputs], dim=0)
+        reprs = torch.cat([x[2] for x in outputs], dim=0)
+        
+        torch.save(reprs, self.pt_result_path)
+        
+        labels = torch.cat([x[3] for x in outputs], dim=0)
         acc = logits.argmax(dim=1).eq(labels).sum().item() / labels.size(0)
         self.log("val_acc", acc)
         
@@ -199,10 +203,10 @@ def main(args):
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=64)
 
     num_labels = train_dataset.num_labels
-    esm_model = EsmForSequenceClassification.from_pretrained(pretrained_model_name_or_path = model_path, num_labels = num_labels)
+    esm_model = EsmForSequenceClassification.from_pretrained(pretrained_model_name_or_path = model_path, num_labels = num_labels, output_hidden_states=True)
 
     # model = ProFunCla(model=esm_model, lr=args.lr, weight_decay=args.weight_decay, finetune_layer=args.finetune_layer, gama=args.sechdule_gamma, oversampling=args.oversampling_size)
-    model = ProFunCla.load_from_checkpoint(model = esm_model,checkpoint_path=args.checkpoint_path, part_result=args.part_result_path, full_result=args.full_result_path)
+    model = ProFunCla.load_from_checkpoint(model = esm_model,checkpoint_path=args.checkpoint_path, part_result=args.part_result_path, full_result=args.full_result_path, pt_result=args.pt_result_path)
     trainer = pl.Trainer(accelerator="gpu", 
                         devices=[0,1,2,3], 
                         # devices=8,
@@ -215,11 +219,14 @@ def main(args):
     trainer.test(model=model, dataloaders=val_loader)
 
 if __name__ == "__main__":
+    import time
+    T1 = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_dataset', type=str, default='/shanjunjie/ProteinMultiClass/data/AIdataset230810.csv')
     parser.add_argument('--inference_dataset', type=str, default="/shanjunjie/ProteinMultiClass/scan/result/csv/domain/bacteria.nonredundant_protein.1.protein.csv")
     parser.add_argument('--checkpoint_path', type=str, default="/shanjunjie/ProteinMultiClass/checkpoint/epoch=6-val_acc=0.9111-loss=0.0000.ckpt")
     parser.add_argument('--part_result_path', type=str, default="/shanjunjie/ProteinMultiClass/convert_csv/part_result.csv")
+    parser.add_argument('--pt_result_path', type=str, default="/shanjunjie/ProteinMultiClass/convert_csv/repr.pt")
     parser.add_argument('--full_result_path', type=str, default="/shanjunjie/ProteinMultiClass/convert_csv/full_result.csv")
     parser.add_argument('--oversampling_size', type=int, default=150)
     parser.add_argument('--finetune_layer', type=int, default=5)
@@ -230,3 +237,5 @@ if __name__ == "__main__":
     parser.add_argument('--device', type=int, default=0)
     args = parser.parse_args()
     main(args)
+    T2 = time.time()
+    print(f"Time: {(T2-T1)}sec")
