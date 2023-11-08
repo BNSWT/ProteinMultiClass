@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from torch.optim.lr_scheduler import StepLR
 from transformers import EsmTokenizer, EsmForSequenceClassification
-model_path = "../esm2_t33_650M_UR50D"
+model_path = "/shanjunjie/ProteinMultiClass/esm2_t33_650M_UR50D"
 
 
 
@@ -93,12 +93,14 @@ class ProFunCla(pl.LightningModule):
         seqs, input_ids, attention_mask, labels = batch
         outputs = self(input_ids=input_ids, attention_mask=attention_mask)
         return seqs, outputs.logits, outputs.hidden_states[-1], labels
+        # return outputs.hidden_states[-1]
     
     def test_epoch_end(self, outputs):
         seqs = [x[0] for x in outputs]
         seqs = [s for seq in seqs for s in seq]
         logits = torch.cat([x[1] for x in outputs], dim=0)
         reprs = torch.cat([x[2] for x in outputs], dim=0)
+        # reprs = torch.cat([x for x in outputs], dim=0)
         
         torch.save(reprs, self.pt_result_path)
         
@@ -177,38 +179,39 @@ def main(args):
     random_seed = 3407
     max_seq_len = 1000
     val_ratio = 0.2
-    pl.seed_everything(random_seed)
-    df = pd.read_csv(args.train_dataset)
-    df = preprocess(df, max_len=max_seq_len)
-    train_df, val_df = train_eval_split(df, val_ratio, random_state=random_seed)
-    train_df.to_csv("train.csv", index=False)
-    val_df.to_csv("test.csv", index=False)
+    # pl.seed_everything(random_seed)
+    # df = pd.read_csv(args.train_dataset)
+    # df = preprocess(df, max_len=max_seq_len)
+    # train_df, val_df = train_eval_split(df, val_ratio, random_state=random_seed)
+    # train_df.to_csv("train.csv", index=False)
+    # val_df.to_csv("test.csv", index=False)
     
     val_df = pd.read_csv(args.inference_dataset)
     if "sequence" not in val_df.columns:
         val_df = val_df.rename(columns={"domain": "sequence"})
     val_df = val_df[val_df["sequence"].apply(lambda x: len(x)) < max_seq_len]
 
-    oversampling_size = args.oversampling_size
-    for label in train_df['label'].unique():
-        label_df = train_df[train_df['label'] == label]
-        if len(label_df) < oversampling_size:
-            train_df = pd.concat([train_df, label_df.sample(n=oversampling_size-len(label_df), replace=True, random_state=random_seed)])
+    # oversampling_size = args.oversampling_size
+    # for label in train_df['label'].unique():
+    #     label_df = train_df[train_df['label'] == label]
+    #     if len(label_df) < oversampling_size:
+    #         train_df = pd.concat([train_df, label_df.sample(n=oversampling_size-len(label_df), replace=True, random_state=random_seed)])
 
 
     tokenizer = EsmTokenizer.from_pretrained(model_path)
-    train_dataset = ProSeqDataset(train_df, tokenizer)
+    # train_dataset = ProSeqDataset(train_df, tokenizer)
     val_dataset = ProSeqDataset(val_df, tokenizer)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=64)
+    # train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=64)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=64)
 
-    num_labels = train_dataset.num_labels
+    # num_labels = train_dataset.num_labels
+    num_labels = 43
     esm_model = EsmForSequenceClassification.from_pretrained(pretrained_model_name_or_path = model_path, num_labels = num_labels, output_hidden_states=True)
 
     # model = ProFunCla(model=esm_model, lr=args.lr, weight_decay=args.weight_decay, finetune_layer=args.finetune_layer, gama=args.sechdule_gamma, oversampling=args.oversampling_size)
     model = ProFunCla.load_from_checkpoint(model = esm_model,checkpoint_path=args.checkpoint_path, part_result=args.part_result_path, full_result=args.full_result_path, pt_result=args.pt_result_path)
     trainer = pl.Trainer(accelerator="gpu", 
-                        devices=[0,1,2,3], 
+                        devices=[0], 
                         # devices=8,
                         # strategy='fsdp_native',
                         max_epochs=50,
