@@ -210,6 +210,4 @@ if __name__ == "__main__":
                         )
 
     # trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
-    trainer.test(model=model, dataloaders=val_loader)
-    
-    
+    trainer.test(model=model, dataloaders=val_loader)    

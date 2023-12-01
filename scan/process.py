@@ -43,10 +43,10 @@ do
     base=$(basename "$file" .faa)
 
     # Construct the output file name
-    output_file="/shanjunjie/ProteinMultiClass/scan/result/dtbl/${{base}}.dtbl"
+    output_file="/shanjunjie/ProteinMultiClass/scan/result/dtbl001/${{base}}.dtbl"
 
     # Perform the hmmscan operation
-    /shanjunjie/hmmer/bin/hmmscan --domE 1e-5 --domtblout "$output_file" --cpu 16 "$database_file" "$file" > log.txt
+    /shanjunjie/hmmer/bin/hmmscan --domE 0.01 --domtblout "$output_file" --cpu 16 "$database_file" "$file" > log.txt
 done""".format('fasta_split/{}'.format(i))
     with open('script/run_{}.sh'.format(i), 'w') as f:
         f.write(script_content)

@@ -165,6 +165,7 @@ lightning_logs/
 wandb/
 *.csv
 visual/data/
+visual/repr
 scan/result/
 scan/script/
 scan/log.txt

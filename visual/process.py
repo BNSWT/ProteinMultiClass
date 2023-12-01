@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
 from mpl_toolkits.mplot3d import Axes3D  
-from sklearn.decomposition import PCA  
+from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix
+import os
+import torch
 
 def confusion(pred, labels):
     label_set = set(labels)
@@ -40,28 +42,29 @@ def scatter(df, labels):
     highlight_index = np.where(labels == args.highlight_class)
     normal_index = np.where(labels != args.highlight_class)
 
-    data = df.values
+    column_to_exclude = ["sequence", "pred", "score"]
+    columns_to_keep = [col for col in df.columns if col not in column_to_exclude]
+    data = df[columns_to_keep].dropna().values
 
-    pca = PCA(n_components=3)
-    data_3d = pca.fit_transform(data)
+    tsne = TSNE(n_components=2)
+    data_2d = tsne.fit_transform(data)
+    torch.save(data_2d, "data_2d.pt")
 
     fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111)
 
-    x = np.array(data_3d[:, 0])
-    y = np.array(data_3d[:, 1])
-    z = np.array(data_3d[:, 2])
+    x = np.array(data_2d[:, 0])
+    y = np.array(data_2d[:, 1])
 
-    highlight = ax.scatter(x[highlight_index], y[highlight_index], z[highlight_index], color='red', label=args.highlight_class)
-    others = ax.scatter(x[normal_index], y[normal_index], z[normal_index], color='blue', label="others")
+    highlight = ax.scatter(x[highlight_index], y[highlight_index], color='red', label=args.highlight_class)
+    others = ax.scatter(x[normal_index], y[normal_index], color='blue', label="others")
 
     ax.set_xlabel('Component 1')
     ax.set_ylabel('Component 2')
-    ax.set_zlabel('Component 3')
 
     ax.legend(handles=[highlight,others])
     # plt.show()
-    plt.savefig("scatter.png")
+    plt.savefig("scatter-tide.png")
 
 def distribution(df):
     class_counts = df['pred'].value_counts()
@@ -75,23 +78,25 @@ def distribution(df):
     # plt.show()
     plt.savefig("distribution.png")
 
-
-
-
 def main(args):
     seq_df = pd.read_csv("part_result.csv")
-    seqs = seq_df['sequence'].values.tolist()
-    pred = seq_df['pred'].values.tolist()
     labels = seq_df['label'].values.tolist()
 
-    df = pd.read_csv("full_result.csv")
-
-    distribution(seq_df)
-    confusion(pred, labels)
+    df = pd.DataFrame()
+    cnt = 0
+    for file in os.listdir("/shanjunjie/ProteinMultiClass/visual/data"):
+        if "part" in file:
+            continue
+        path = "/shanjunjie/ProteinMultiClass/visual/data/" + file
+        data = pd.read_csv(path)
+        df = pd.concat([df, data], ignore_index=True)
+        cnt += 1
+    distribution(df)
+    # confusion(pred, labels)
     scatter(df, labels)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--highlight_class", type=str, default="cys")
+    parser.add_argument("--highlight_class", type=str, default="val")
     args = parser.parse_args()
     main(args)
