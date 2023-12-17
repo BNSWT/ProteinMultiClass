@@ -1,2 +1,2 @@
 cd /shanjunjie/ProteinMultiClass/visual
-python process.py
+python repr.py

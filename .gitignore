@@ -169,3 +169,4 @@ visual/repr
 scan/result/
 scan/script/
 scan/log.txt
+*.pt

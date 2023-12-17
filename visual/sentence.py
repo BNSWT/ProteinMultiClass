@@ -34,11 +34,15 @@ def process_file(i):
         for scan_row in scan_df[scan_df['name'] == name].values.tolist():
             seq_content = scan_row[2]
             result_row = result_df[result_df['sequence'] == seq_content]
+            if result_row.shape[0] == 0:
+                continue
+            if result_row["score"].values.tolist()[0] < 0.95:
+                continue
             output_row = [name]+result_row.values.tolist()[0]
 
             output_df[cnt-1] = pd.concat([output_df[cnt-1], pd.DataFrame(dict(zip(column_names, output_row)), index=[0], columns=column_names)], ignore_index=True)
     print(f"Finished processing file {i}")
-    return output_df, total_cnt, more_cnt
+    return output_df.drop_duplicates(), total_cnt, more_cnt
 
 if __name__ == "__main__":
     with ProcessPoolExecutor(max_workers=cpu_num) as executor:
@@ -59,4 +63,4 @@ if __name__ == "__main__":
 
     # Write the final results
     for i in range(20):
-        final_output_df[i].to_csv(f"/shanjunjie/ProteinMultiClass/visual/csv-001/have{i+1}domain.csv", index=False)
+        final_output_df[i].to_csv(f"/shanjunjie/ProteinMultiClass/visual/filtered/have{i+1}domain.csv", index=False)
